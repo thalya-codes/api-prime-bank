@@ -286,7 +286,7 @@ app.get("/bankAccount/user", authenticate, async (req, res) => {
     }
 
     // Como usamos .limit(1), pegamos o primeiro documento retornado
-    const doc = snapshot.docs[0];
+    const doc = snapshot.docs[1];
     const accountData = {id: doc.id, ...doc.data()};
 
     // Retorna os dados da conta
