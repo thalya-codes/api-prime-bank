@@ -97,11 +97,12 @@ app.post("/users", async (req, res) => {
       name: fullName,
       balance: 4000,
       createdAt: new Date().toISOString(),
+      bankAccountNumber: crypto.randomUUID(),
     };
 
     const accountRef = await database
-        .collection("bankAccounts")
-        .add(newAccountData);
+      .collection("bankAccounts")
+      .add(newAccountData);
 
     return res.status(200).send({
       message: "Usuário e Conta Principal criados com sucesso!",
@@ -126,8 +127,8 @@ app.get("/users", authenticate, async (req, res) => {
     return res.status(200).send(response);
   } catch (error) {
     return res
-        .status(500)
-        .send({ message: "Erro ao buscar usuários", error: error.message });
+      .status(500)
+      .send({ message: "Erro ao buscar usuários", error: error.message });
   }
 });
 
@@ -219,12 +220,12 @@ app.post("/bankAccounts", authenticate, async (req, res) => {
       associatedUser: userId,
       balance: parseFloat(initialBalance) || 5000,
       createdAt: new Date(),
-      bankAccountNumber: uuidv4()
+      bankAccountNumber: uuidv4(),
     };
 
     const docRef = await database
-        .collection("bankAccounts")
-        .add(newAccountData);
+      .collection("bankAccounts")
+      .add(newAccountData);
 
     return res.status(201).send({
       message: "Conta bancária criada com sucesso!",
@@ -244,8 +245,8 @@ app.post("/bankAccounts", authenticate, async (req, res) => {
 app.get("/bankAccounts", authenticate, async (req, res) => {
   try {
     const query = database
-        .collection("bankAccounts")
-        .orderBy("createdAt", "asc");
+      .collection("bankAccounts")
+      .orderBy("createdAt", "asc");
     const querySnapshot = await query.get();
 
     const bankAccounts = querySnapshot.docs.map((doc) => ({
@@ -274,8 +275,8 @@ app.get("/bankAccount/user", authenticate, async (req, res) => {
     // Realiza uma query para encontrar o documento onde o 'associatedUser' é igual ao userId do token
     const bankAccountsRef = database.collection("bankAccounts");
     const snapshot = await bankAccountsRef
-        .where("associatedUser", "==", userId)
-        .get();
+      .where("associatedUser", "==", userId)
+      .get();
 
     if (snapshot.empty) {
       return res.status(404).send({
@@ -308,8 +309,8 @@ app.post("/transactions", authenticate, async (req, res) => {
 
   if (!fromAccountId || !toAccountId || !amount || amount <= 0) {
     return res
-        .status(400)
-        .send({ message: "Dados de transação inválidos ou incompletos." });
+      .status(400)
+      .send({ message: "Dados de transação inválidos ou incompletos." });
   }
 
   const fromAccountRef = database.collection("bankAccounts").doc(fromAccountId);
@@ -328,78 +329,78 @@ app.post("/transactions", authenticate, async (req, res) => {
     // }
 
     const transactionRefs = await database.runTransaction(
-        async (transaction) => {
-          const fromDoc = await transaction.get(fromAccountRef);
-          const toDoc = await transaction.get(toAccountRef);
+      async (transaction) => {
+        const fromDoc = await transaction.get(fromAccountRef);
+        const toDoc = await transaction.get(toAccountRef);
 
-          if (!fromDoc.exists || !toDoc.exists) {
-            throw new Error("Uma das contas bancárias não foi encontrada.");
-          }
-
-          if (fromDoc.data().associatedUser !== userId) {
-            throw new Error(
-                "Permissão negada. Você não é o dono da conta de origem."
-            );
-          }
-
-          const currentBalance = fromDoc.data().balance || 0;
-          const transferAmount = parseFloat(amount);
-
-          if (currentBalance < transferAmount) {
-            throw new Error("Saldo insuficiente para realizar a transação.");
-          }
-
-          const newFromBalance = currentBalance - transferAmount;
-          const newToBalance = (toDoc.data().balance || 0) + transferAmount;
-
-          transaction.update(fromAccountRef, { balance: newFromBalance });
-          transaction.update(toAccountRef, { balance: newToBalance });
-
-          const senderUID = fromDoc.data().associatedUser;
-          const receiverUID = toDoc.data().associatedUser;
-          const dateString = new Date();
-          const baseTransactionRef = database.collection("transactions").doc();
-
-          const senderTransactionData = {
-            fromAccountId: fromAccountId,
-            toAccountId: toAccountId,
-            amount: transferAmount,
-            date: dateString,
-            fileName: fileName || null,
-            fileUrl: fileUrl || null,
-            associatedUser: senderUID,
-            type: "sended",
-            createdAt: dateString,
-            name: fromDoc.data().name,
-            category: category,
-          };
-
-          transaction.set(baseTransactionRef, senderTransactionData);
-
-          const receiverTransactionData = {
-            fromAccountId: fromAccountId,
-            toAccountId: toAccountId,
-            amount: transferAmount,
-            date: dateString,
-            fileName: fileName || null,
-            fileUrl: fileUrl || null,
-            associatedUser: receiverUID,
-            type: "received",
-            createdAt: dateString,
-            name: toDoc.data().name,
-            category: category,
-          };
-
-          const receiverTransactionRef = database
-              .collection("transactions")
-              .doc();
-          transaction.set(receiverTransactionRef, receiverTransactionData);
-
-          return {
-            senderId: baseTransactionRef.id,
-            receiverId: receiverTransactionRef.id,
-          };
+        if (!fromDoc.exists || !toDoc.exists) {
+          throw new Error("Uma das contas bancárias não foi encontrada.");
         }
+
+        if (fromDoc.data().associatedUser !== userId) {
+          throw new Error(
+            "Permissão negada. Você não é o dono da conta de origem."
+          );
+        }
+
+        const currentBalance = fromDoc.data().balance || 0;
+        const transferAmount = parseFloat(amount);
+
+        if (currentBalance < transferAmount) {
+          throw new Error("Saldo insuficiente para realizar a transação.");
+        }
+
+        const newFromBalance = currentBalance - transferAmount;
+        const newToBalance = (toDoc.data().balance || 0) + transferAmount;
+
+        transaction.update(fromAccountRef, { balance: newFromBalance });
+        transaction.update(toAccountRef, { balance: newToBalance });
+
+        const senderUID = fromDoc.data().associatedUser;
+        const receiverUID = toDoc.data().associatedUser;
+        const dateString = new Date();
+        const baseTransactionRef = database.collection("transactions").doc();
+
+        const senderTransactionData = {
+          fromAccountId: fromAccountId,
+          toAccountId: toAccountId,
+          amount: transferAmount,
+          date: dateString,
+          fileName: fileName || null,
+          fileUrl: fileUrl || null,
+          associatedUser: senderUID,
+          type: "sended",
+          createdAt: dateString,
+          name: fromDoc.data().name,
+          category: category,
+        };
+
+        transaction.set(baseTransactionRef, senderTransactionData);
+
+        const receiverTransactionData = {
+          fromAccountId: fromAccountId,
+          toAccountId: toAccountId,
+          amount: transferAmount,
+          date: dateString,
+          fileName: fileName || null,
+          fileUrl: fileUrl || null,
+          associatedUser: receiverUID,
+          type: "received",
+          createdAt: dateString,
+          name: toDoc.data().name,
+          category: category,
+        };
+
+        const receiverTransactionRef = database
+          .collection("transactions")
+          .doc();
+        transaction.set(receiverTransactionRef, receiverTransactionData);
+
+        return {
+          senderId: baseTransactionRef.id,
+          receiverId: receiverTransactionRef.id,
+        };
+      }
     );
 
     return res.status(201).send({
@@ -437,9 +438,9 @@ app.get("/transactions", authenticate, async (req, res) => {
     const pageSize = parseInt(itemsPerPage, 10) || 100;
 
     let query = database
-        .collection("transactions")
-        .where("associatedUser", "==", userId)
-        .orderBy("date", "desc");
+      .collection("transactions")
+      .where("associatedUser", "==", userId)
+      .orderBy("date", "desc");
 
     // 1. Aplicação dos Filtros de Quantidade
     if (minAmountValue !== null) {
@@ -474,9 +475,9 @@ app.get("/transactions", authenticate, async (req, res) => {
     // 3. Paginação
     if (lastItemId) {
       const cursorDoc = await database
-          .collection("transactions")
-          .doc(lastItemId)
-          .get();
+        .collection("transactions")
+        .doc(lastItemId)
+        .get();
 
       if (cursorDoc.exists) {
         query = query.startAfter(cursorDoc);
@@ -626,9 +627,9 @@ app.get("/investments", authenticate, async (req, res) => {
     const userId = req.user.user_id;
 
     const query = database
-        .collection("investments")
-        .where("associatedUser", "==", userId)
-        .orderBy("createdAt", "desc");
+      .collection("investments")
+      .where("associatedUser", "==", userId)
+      .orderBy("createdAt", "desc");
 
     const querySnapshot = await query.get();
 
@@ -836,8 +837,8 @@ app.get("/analytics", authenticate, async (req, res) => {
   try {
     // 1. Buscar todas as transações do usuário
     const transactionsQuery = database
-        .collection("transactions")
-        .where("associatedUser", "==", userId);
+      .collection("transactions")
+      .where("associatedUser", "==", userId);
 
     const snapshot = await transactionsQuery.get();
 
@@ -845,18 +846,18 @@ app.get("/analytics", authenticate, async (req, res) => {
     let currentBalance = 0;
     try {
       const accountsSnapshot = await database
-          .collection("bankAccounts")
-          .where("associatedUser", "==", userId)
-          .limit(1)
-          .get();
+        .collection("bankAccounts")
+        .where("associatedUser", "==", userId)
+        .limit(1)
+        .get();
       if (!accountsSnapshot.empty) {
         currentBalance = parseFloat(
-            accountsSnapshot.docs[0].data().balance || 0
+          accountsSnapshot.docs[0].data().balance || 0
         );
       }
     } catch (e) {
       console.warn(
-          "Não foi possível buscar o saldo da conta principal. Usando 0.00 como fallback."
+        "Não foi possível buscar o saldo da conta principal. Usando 0.00 como fallback."
       );
     }
 
@@ -930,15 +931,15 @@ app.get("/analytics", authenticate, async (req, res) => {
 
     // Conversão da agregação mensal em array ordenado e formatado
     const monthlyFlowData = Object.keys(monthlyData)
-        .sort() // Ordena por chave YYYY-MM
-        .map((key) => ({
-          label: monthlyData[key].label,
-          // O campo 'total' (que era o netFlow) foi removido.
-          income: parseFloat(monthlyData[key].income.toFixed(2)),
-          expense: parseFloat(monthlyData[key].expense.toFixed(2)),
-          // Converte para string YYYY-MM-DD
-          monthStart: monthlyData[key].monthStart.toISOString().split("T")[0],
-        }));
+      .sort() // Ordena por chave YYYY-MM
+      .map((key) => ({
+        label: monthlyData[key].label,
+        // O campo 'total' (que era o netFlow) foi removido.
+        income: parseFloat(monthlyData[key].income.toFixed(2)),
+        expense: parseFloat(monthlyData[key].expense.toFixed(2)),
+        // Converte para string YYYY-MM-DD
+        monthStart: monthlyData[key].monthStart.toISOString().split("T")[0],
+      }));
 
     // 5. Montagem da Resposta Final
     const analyticsData = {
@@ -1004,3 +1005,4 @@ app.get("/analytics", authenticate, async (req, res) => {
     });
   }
 });
+
