@@ -813,3 +813,193 @@ app.listen(PORT, () => {
   console.log(`🚀 Servidor rodando na porta ${PORT}`);
 });
 
+const monthNames = [
+  "Jan",
+  "Fev",
+  "Mar",
+  "Abr",
+  "Mai",
+  "Jun",
+  "Jul",
+  "Ago",
+  "Set",
+  "Out",
+  "Nov",
+  "Dez",
+];
+
+app.get("/analytics", authenticate, async (req, res) => {
+  // O ID do usuário é obtido do token pelo middleware 'authenticate'
+  const userId = req.user.user_id;
+
+  try {
+    // 1. Buscar todas as transações do usuário
+    const transactionsQuery = database
+        .collection("transactions")
+        .where("associatedUser", "==", userId);
+
+    const snapshot = await transactionsQuery.get();
+
+    // 2. Buscar o Saldo Atual (Idealmente vem da conta bancária)
+    let currentBalance = 0;
+    try {
+      const accountsSnapshot = await database
+          .collection("bankAccounts")
+          .where("associatedUser", "==", userId)
+          .limit(1)
+          .get();
+      if (!accountsSnapshot.empty) {
+        currentBalance = parseFloat(
+            accountsSnapshot.docs[0].data().balance || 0
+        );
+      }
+    } catch (e) {
+      console.warn(
+          "Não foi possível buscar o saldo da conta principal. Usando 0.00 como fallback."
+      );
+    }
+
+    // 3. Processamento e Agregação dos Dados
+    const totalTransactions = snapshot.docs.length;
+    let totalAmountMoved = 0;
+    let sendedCount = 0;
+    let receivedCount = 0;
+    let sendedAmount = 0;
+    let receivedAmount = 0;
+
+    // Estrutura para agregação mensal: { "YYYY-MM": { income: number, expense: number, label: string, date: Date } }
+    const monthlyData = {};
+
+    snapshot.docs.forEach((doc) => {
+      const data = doc.data();
+      // Garante que o valor é um número
+      const amount = parseFloat(data.amount || 0);
+
+      // --- Lógica de KPI (original) ---
+      totalAmountMoved += amount;
+      if (data.type === "sended") {
+        sendedCount++;
+        sendedAmount += amount;
+      } else if (data.type === "received") {
+        receivedCount++;
+        receivedAmount += amount;
+      }
+
+      // --- Lógica de Agregação Mensal (AGORA SEM NETFLOW) ---
+      const transactionDate =
+        data.date && data.date.toDate ? data.date.toDate() : data.date;
+
+      if (transactionDate instanceof Date && !isNaN(transactionDate)) {
+        const year = transactionDate.getFullYear();
+        const monthIndex = transactionDate.getMonth(); // 0 a 11
+
+        // Chave única (ex: "2024-09") para ordenação e agrupamento
+        const monthKey = `${year}-${String(monthIndex + 1).padStart(2, "0")}`;
+
+        if (!monthlyData[monthKey]) {
+          // Cria o objeto Date para o início do mês (dia 1, 00:00:00)
+          const startOfMonth = new Date(year, monthIndex, 1);
+
+          monthlyData[monthKey] = {
+            income: 0, // Recebidos
+            expense: 0, // Enviados
+            // Ex: "Set 2024" (rótulo para o gráfico)
+            label: `${monthNames[monthIndex]} ${year}`,
+            monthStart: startOfMonth,
+          };
+        }
+
+        // Agregação do valor para o mês
+        if (data.type === "sended") {
+          monthlyData[monthKey].expense += amount;
+        } else if (data.type === "received") {
+          monthlyData[monthKey].income += amount;
+        }
+      }
+    });
+
+    // 4. Cálculos para Gráficos e KPIs
+    const totalCount = sendedCount + receivedCount;
+
+    const sendedPercentage =
+      totalCount > 0 ? ((sendedCount / totalCount) * 100).toFixed(2) : "0.00";
+
+    const receivedPercentage =
+      totalCount > 0 ? ((receivedCount / totalCount) * 100).toFixed(2) : "0.00";
+
+    // Conversão da agregação mensal em array ordenado e formatado
+    const monthlyFlowData = Object.keys(monthlyData)
+        .sort() // Ordena por chave YYYY-MM
+        .map((key) => ({
+          label: monthlyData[key].label,
+          // O campo 'total' (que era o netFlow) foi removido.
+          income: parseFloat(monthlyData[key].income.toFixed(2)),
+          expense: parseFloat(monthlyData[key].expense.toFixed(2)),
+          // Converte para string YYYY-MM-DD
+          monthStart: monthlyData[key].monthStart.toISOString().split("T")[0],
+        }));
+
+    // 5. Montagem da Resposta Final
+    const analyticsData = {
+      // --------------------------------------------------------
+      // KPIs - Para Cards no Topo (como nas suas imagens)
+      // --------------------------------------------------------
+      kpis: {
+        totalTransactions: totalTransactions,
+        // O valor que o usuário movimentou (enviado + recebido)
+        totalAmountMoved: totalAmountMoved,
+        receivedAmount: receivedAmount, // Receitas
+        sendedAmount: sendedAmount, // Despesas (saídas)
+        currentBalance: currentBalance, // Saldo Atual
+      },
+
+      // --------------------------------------------------------
+      // Dados para Gráficos
+      // --------------------------------------------------------
+      charts: {
+        // Gráfico de Barras: Receitas vs Despesas (Volume)
+        revenueVsExpenses: [
+          { name: "Receitas", value: receivedAmount, color: "#43A047" }, // verde
+          { name: "Despesas", value: sendedAmount, color: "#E53935" }, // vermelho
+        ],
+
+        // Gráfico de Pizza: Distribuição por Tipo (Contagem)
+        distributionByType: [
+          {
+            name: "Recebidas",
+            count: receivedCount,
+            percentage: parseFloat(receivedPercentage),
+            color: "#1E88E5",
+          }, // azul
+          {
+            name: "Transferidas",
+            count: sendedCount,
+            percentage: parseFloat(sendedPercentage),
+            color: "#FFB300",
+          }, // amarelo
+        ],
+
+        // Dados para Gráfico de Fluxo Mensal (AGORA SÓ COM ENTRADA E SAÍDA)
+        // Estrutura: { label: string, income: number, expense: number, monthStart: string }
+        monthlyFlowData: monthlyFlowData,
+
+        // Dados brutos de contagem/porcentagem
+        distributionDetails: {
+          sended: { count: sendedCount, percentage: `${sendedPercentage}%` },
+          received: {
+            count: receivedCount,
+            percentage: `${receivedPercentage}%`,
+          },
+        },
+      },
+    };
+
+    return res.status(200).send(analyticsData);
+  } catch (error) {
+    console.error("Erro ao buscar dados de analytics:", error.message);
+    return res.status(500).send({
+      message: "Erro interno do servidor ao buscar dados de análise da conta.",
+      error: error.message,
+    });
+  }
+});
