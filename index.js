@@ -132,7 +132,7 @@ app.get("/users", authenticate, async (req, res) => {
 });
 
 // read user by ID
-app.get("/users/:id", authenticate, async (req, res) => {
+app.get("/user/:id", authenticate, async (req, res) => {
   try {
     const userId = req.params.id;
     const userRef = database.collection("users").doc(userId);
@@ -263,39 +263,42 @@ app.get("/bankAccounts", authenticate, async (req, res) => {
 });
 
 // Read bank account by ID
-app.get("/bankAccounts/:id", authenticate, async (req, res) => {
+app.get("/bankAccount/user", authenticate, async (req, res) => {
   try {
-    const accountDocId = req.params.id;
+    // O userId é extraído do token pelo seu middleware 'authenticate'
     const userId = req.user.user_id;
+    console.log("Buscando conta para o usuário:", userId);
 
-    const docRef = database.collection("bankAccounts").doc(accountDocId);
-    const doc = await docRef.get();
+    // eslint-disable-next-line max-len
+    // Realiza uma query para encontrar o documento onde o 'associatedUser' é igual ao userId do token
+    const bankAccountsRef = database.collection("bankAccounts");
+    const snapshot = await bankAccountsRef
+        .where("associatedUser", "==", userId)
+        .limit(1)
+        .get();
 
-    if (!doc.exists) {
+    if (snapshot.empty) {
       return res
           .status(404)
-          .send({message: "Conta bancária não encontrada."});
+          .send({
+            message: "Nenhuma conta bancária encontrada para este usuário.",
+          });
     }
 
+    // Como usamos .limit(1), pegamos o primeiro documento retornado
+    const doc = snapshot.docs[0];
     const accountData = {id: doc.id, ...doc.data()};
 
-    if (accountData.associatedUser !== userId) {
-      return res.status(403).send({
-        message:
-          "Acesso negado. Esta conta bancária não pertence ao seu usuário.",
-      });
-    }
-
+    // Retorna os dados da conta
     return res.status(200).send(accountData);
   } catch (error) {
-    console.error("Erro ao buscar conta bancária:", error);
+    console.error("Erro ao buscar conta bancária por userId:", error);
     return res.status(500).send({
       message: "Erro interno do servidor ao buscar conta bancária.",
       error: error.message,
     });
   }
 });
-
 
 //  Rotas TRANSACTIONS
 // Create transaction (Transferência)
@@ -337,7 +340,7 @@ app.post("/transactions", authenticate, async (req, res) => {
 
           if (fromDoc.data().associatedUser !== userId) {
             throw new Error(
-                "Permissão negada. Você não é o dono da conta de origem.",
+                "Permissão negada. Você não é o dono da conta de origem."
             );
           }
 
@@ -398,7 +401,7 @@ app.post("/transactions", authenticate, async (req, res) => {
             senderId: baseTransactionRef.id,
             receiverId: receiverTransactionRef.id,
           };
-        },
+        }
     );
 
     return res.status(201).send({
@@ -751,7 +754,6 @@ app.delete("/investments/:id", authenticate, async (req, res) => {
     });
   }
 });
-
 
 /* =========================================================================
  * 🖼️ ROTA DE UPLOAD (CONVERTIDA PARA EXPRESS)
