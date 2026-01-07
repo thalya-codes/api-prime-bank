@@ -10,7 +10,7 @@ const busboy = require("busboy");
 const path = require("path");
 const os = require("os");
 const fs = require("fs");
-const {v4: uuidv4} = require("uuid");
+const { v4: uuidv4 } = require("uuid");
 
 // Arquivo de Permissões (Certifique-se de que o arquivo está na raiz)
 const serviceAccount = require("./permisions.json");
@@ -34,7 +34,7 @@ const bucket = admin.storage().bucket();
 const app = express();
 
 // Middlewares padrão
-app.use(cors({origin: true}));
+app.use(cors({ origin: true }));
 app.use(express.json()); // Essencial para ler req.body em APIs Node padrão
 
 /* -------------------------------------------------------------------------
@@ -58,7 +58,7 @@ const authenticate = async (req, res, next) => {
     next();
   } catch (error) {
     console.error("Erro ao verificar o Token:", error);
-    return res.status(401).send({message: "Token inválido ou expirado."});
+    return res.status(401).send({ message: "Token inválido ou expirado." });
   }
 };
 
@@ -73,7 +73,7 @@ app.get("/", (req, res) => {
 
 // CREATE USER
 app.post("/users", async (req, res) => {
-  const {fullName, email, password, telephone, acceptTermAndPolice} =
+  const { fullName, email, password, telephone, acceptTermAndPolice } =
     req.body;
 
   try {
@@ -127,7 +127,7 @@ app.get("/users", authenticate, async (req, res) => {
   } catch (error) {
     return res
         .status(500)
-        .send({message: "Erro ao buscar usuários", error: error.message});
+        .send({ message: "Erro ao buscar usuários", error: error.message });
   }
 });
 
@@ -139,7 +139,7 @@ app.get("/user/:id", authenticate, async (req, res) => {
     const doc = await userRef.get();
 
     if (!doc.exists) {
-      return res.status(404).send({message: "Usuário não encontrado."});
+      return res.status(404).send({ message: "Usuário não encontrado." });
     }
 
     const userData = {
@@ -164,7 +164,7 @@ app.put("/users/:id", authenticate, async (req, res) => {
     const doc = await userRef.get();
 
     if (!doc.exists) {
-      return res.status(404).send({message: "Usuário não encontrado."});
+      return res.status(404).send({ message: "Usuário não encontrado." });
     }
 
     await userRef.update(updateData);
@@ -190,7 +190,7 @@ app.delete("/users/:id", authenticate, async (req, res) => {
     const doc = await userRef.get();
 
     if (!doc.exists) {
-      return res.status(404).send({message: "Usuário não encontrado."});
+      return res.status(404).send({ message: "Usuário não encontrado." });
     }
 
     await userRef.delete();
@@ -213,7 +213,7 @@ app.delete("/users/:id", authenticate, async (req, res) => {
 app.post("/bankAccounts", authenticate, async (req, res) => {
   try {
     const userId = req.user.user_id;
-    const {initialBalance} = req.body;
+    const { initialBalance } = req.body;
 
     const newAccountData = {
       associatedUser: userId,
@@ -274,20 +274,17 @@ app.get("/bankAccount/user", authenticate, async (req, res) => {
     const bankAccountsRef = database.collection("bankAccounts");
     const snapshot = await bankAccountsRef
         .where("associatedUser", "==", userId)
-        .limit(1)
         .get();
 
     if (snapshot.empty) {
-      return res
-          .status(404)
-          .send({
-            message: "Nenhuma conta bancária encontrada para este usuário.",
-          });
+      return res.status(404).send({
+        message: "Nenhuma conta bancária encontrada para este usuário.",
+      });
     }
 
     // Como usamos .limit(1), pegamos o primeiro documento retornado
     const doc = snapshot.docs[1];
-    const accountData = {id: doc.id, ...doc.data()};
+    const accountData = { id: doc.id, ...doc.data() };
 
     // Retorna os dados da conta
     return res.status(200).send(accountData);
@@ -304,14 +301,14 @@ app.get("/bankAccount/user", authenticate, async (req, res) => {
 // Create transaction (Transferência)
 app.post("/transactions", authenticate, async (req, res) => {
   const userId = req.user.user_id;
-  const {fromAccountId, toAccountId, amount, category} = req.body;
+  const { fromAccountId, toAccountId, amount, category } = req.body;
   let fileUrl;
   let fileName;
 
   if (!fromAccountId || !toAccountId || !amount || amount <= 0) {
     return res
         .status(400)
-        .send({message: "Dados de transação inválidos ou incompletos."});
+        .send({ message: "Dados de transação inválidos ou incompletos." });
   }
 
   const fromAccountRef = database.collection("bankAccounts").doc(fromAccountId);
@@ -354,8 +351,8 @@ app.post("/transactions", authenticate, async (req, res) => {
           const newFromBalance = currentBalance - transferAmount;
           const newToBalance = (toDoc.data().balance || 0) + transferAmount;
 
-          transaction.update(fromAccountRef, {balance: newFromBalance});
-          transaction.update(toAccountRef, {balance: newToBalance});
+          transaction.update(fromAccountRef, { balance: newFromBalance });
+          transaction.update(toAccountRef, { balance: newToBalance });
 
           const senderUID = fromDoc.data().associatedUser;
           const receiverUID = toDoc.data().associatedUser;
@@ -418,7 +415,7 @@ app.post("/transactions", authenticate, async (req, res) => {
       error.message.includes("Permissão negada") ||
       error.message.includes("não foi encontrada")
     ) {
-      return res.status(403).send({message: error.message});
+      return res.status(403).send({ message: error.message });
     }
 
     return res.status(500).send({
@@ -432,7 +429,7 @@ app.post("/transactions", authenticate, async (req, res) => {
 app.get("/transactions", authenticate, async (req, res) => {
   try {
     const userId = req.user.user_id;
-    const {minAmount, maxAmount, month, itemsPerPage, lastItemId} = req.query;
+    const { minAmount, maxAmount, month, itemsPerPage, lastItemId } = req.query;
 
     const minAmountValue = minAmount ? parseFloat(minAmount) : null;
     const maxAmountValue = maxAmount ? parseFloat(maxAmount) : null;
@@ -527,10 +524,10 @@ app.get("/transactions/:id", authenticate, async (req, res) => {
     const doc = await docRef.get();
 
     if (!doc.exists) {
-      return res.status(404).send({message: "Transação não encontrada."});
+      return res.status(404).send({ message: "Transação não encontrada." });
     }
 
-    const transactionData = {id: doc.id, ...doc.data()};
+    const transactionData = { id: doc.id, ...doc.data() };
 
     // ⭐️ VERIFICAÇÃO DE PROPRIEDADE
     if (transactionData.associatedUser !== userId) {
@@ -560,7 +557,7 @@ app.put("/transactions/:id", authenticate, async (req, res) => {
     const doc = await docRef.get();
 
     if (!doc.exists) {
-      return res.status(404).send({message: "Transação não encontrada."});
+      return res.status(404).send({ message: "Transação não encontrada." });
     }
 
     // ⭐️ VERIFICAÇÃO DE PROPRIEDADE
@@ -597,7 +594,7 @@ app.delete("/transactions/:id", authenticate, async (req, res) => {
     const doc = await docRef.get();
 
     if (!doc.exists) {
-      return res.status(404).send({message: "Transação não encontrada."});
+      return res.status(404).send({ message: "Transação não encontrada." });
     }
 
     // ⭐️ VERIFICAÇÃO DE PROPRIEDADE
@@ -659,10 +656,10 @@ app.get("/investments/:id", authenticate, async (req, res) => {
     const doc = await docRef.get();
 
     if (!doc.exists) {
-      return res.status(404).send({message: "Investimento não encontrado."});
+      return res.status(404).send({ message: "Investimento não encontrado." });
     }
 
-    const investmentData = {id: doc.id, ...doc.data()};
+    const investmentData = { id: doc.id, ...doc.data() };
 
     // ⭐️ VERIFICAÇÃO DE PROPRIEDADE
     if (investmentData.associatedUser !== userId) {
@@ -693,7 +690,7 @@ app.put("/investments/:id", authenticate, async (req, res) => {
     const doc = await docRef.get();
 
     if (!doc.exists) {
-      return res.status(404).send({message: "Investimento não encontrado."});
+      return res.status(404).send({ message: "Investimento não encontrado." });
     }
 
     // ⭐️ VERIFICAÇÃO DE PROPRIEDADE
@@ -730,7 +727,7 @@ app.delete("/investments/:id", authenticate, async (req, res) => {
     const doc = await docRef.get();
 
     if (!doc.exists) {
-      return res.status(404).send({message: "Investimento não encontrado."});
+      return res.status(404).send({ message: "Investimento não encontrado." });
     }
 
     // ⭐️ VERIFICAÇÃO DE PROPRIEDADE
@@ -760,16 +757,16 @@ app.delete("/investments/:id", authenticate, async (req, res) => {
  * ========================================================================= */
 
 app.post("/upload", authenticate, (req, res) => {
-  const bb = busboy({headers: req.headers});
+  const bb = busboy({ headers: req.headers });
   const userId = req.user.uid;
   let uploadData = null;
 
   bb.on("file", (name, file, info) => {
-    const {filename, mimeType} = info;
+    const { filename, mimeType } = info;
     const uniqueFileName = `${Date.now()}-${filename}`;
     const filepath = path.join(os.tmpdir(), uniqueFileName);
 
-    uploadData = {filepath, filename: uniqueFileName, mimeType};
+    uploadData = { filepath, filename: uniqueFileName, mimeType };
     file.pipe(fs.createWriteStream(filepath));
   });
 
@@ -784,7 +781,7 @@ app.post("/upload", authenticate, (req, res) => {
         destination,
         metadata: {
           contentType: uploadData.mimeType,
-          metadata: {firebaseStorageDownloadTokens: token},
+          metadata: { firebaseStorageDownloadTokens: token },
         },
       });
 
@@ -798,7 +795,7 @@ app.post("/upload", authenticate, (req, res) => {
       });
 
       fs.unlinkSync(uploadData.filepath);
-      res.status(200).send({url: publicUrl});
+      res.status(200).send({ url: publicUrl });
     } catch (error) {
       res.status(500).send(error.message);
     }
