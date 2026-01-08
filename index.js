@@ -10,7 +10,7 @@ const busboy = require("busboy");
 const path = require("path");
 const os = require("os");
 const fs = require("fs");
-const { v4: uuidv4 } = require("uuid");
+const {v4: uuidv4} = require("uuid");
 
 // Arquivo de Permissões (Certifique-se de que o arquivo está na raiz)
 const serviceAccount = require("./permisions.json");
@@ -34,7 +34,7 @@ const bucket = admin.storage().bucket();
 const app = express();
 
 // Middlewares padrão
-app.use(cors({ origin: true }));
+app.use(cors({origin: true}));
 app.use(express.json()); // Essencial para ler req.body em APIs Node padrão
 
 /* -------------------------------------------------------------------------
@@ -58,7 +58,7 @@ const authenticate = async (req, res, next) => {
     next();
   } catch (error) {
     console.error("Erro ao verificar o Token:", error);
-    return res.status(401).send({ message: "Token inválido ou expirado." });
+    return res.status(401).send({message: "Token inválido ou expirado."});
   }
 };
 
@@ -73,7 +73,7 @@ app.get("/", (req, res) => {
 
 // CREATE USER
 app.post("/users", async (req, res) => {
-  const { fullName, email, password, telephone, acceptTermAndPolice } =
+  const {fullName, email, password, telephone, acceptTermAndPolice} =
     req.body;
 
   try {
@@ -101,8 +101,8 @@ app.post("/users", async (req, res) => {
     };
 
     const accountRef = await database
-      .collection("bankAccounts")
-      .add(newAccountData);
+        .collection("bankAccounts")
+        .add(newAccountData);
 
     return res.status(200).send({
       message: "Usuário e Conta Principal criados com sucesso!",
@@ -127,8 +127,8 @@ app.get("/users", authenticate, async (req, res) => {
     return res.status(200).send(response);
   } catch (error) {
     return res
-      .status(500)
-      .send({ message: "Erro ao buscar usuários", error: error.message });
+        .status(500)
+        .send({message: "Erro ao buscar usuários", error: error.message});
   }
 });
 
@@ -140,7 +140,7 @@ app.get("/user/:id", authenticate, async (req, res) => {
     const doc = await userRef.get();
 
     if (!doc.exists) {
-      return res.status(404).send({ message: "Usuário não encontrado." });
+      return res.status(404).send({message: "Usuário não encontrado."});
     }
 
     const userData = {
@@ -165,7 +165,7 @@ app.put("/users/:id", authenticate, async (req, res) => {
     const doc = await userRef.get();
 
     if (!doc.exists) {
-      return res.status(404).send({ message: "Usuário não encontrado." });
+      return res.status(404).send({message: "Usuário não encontrado."});
     }
 
     await userRef.update(updateData);
@@ -191,7 +191,7 @@ app.delete("/users/:id", authenticate, async (req, res) => {
     const doc = await userRef.get();
 
     if (!doc.exists) {
-      return res.status(404).send({ message: "Usuário não encontrado." });
+      return res.status(404).send({message: "Usuário não encontrado."});
     }
 
     await userRef.delete();
@@ -214,7 +214,7 @@ app.delete("/users/:id", authenticate, async (req, res) => {
 app.post("/bankAccounts", authenticate, async (req, res) => {
   try {
     const userId = req.user.user_id;
-    const { initialBalance } = req.body;
+    const {initialBalance} = req.body;
 
     const newAccountData = {
       associatedUser: userId,
@@ -224,8 +224,8 @@ app.post("/bankAccounts", authenticate, async (req, res) => {
     };
 
     const docRef = await database
-      .collection("bankAccounts")
-      .add(newAccountData);
+        .collection("bankAccounts")
+        .add(newAccountData);
 
     return res.status(201).send({
       message: "Conta bancária criada com sucesso!",
@@ -245,8 +245,8 @@ app.post("/bankAccounts", authenticate, async (req, res) => {
 app.get("/bankAccounts", authenticate, async (req, res) => {
   try {
     const query = database
-      .collection("bankAccounts")
-      .orderBy("createdAt", "asc");
+        .collection("bankAccounts")
+        .orderBy("createdAt", "asc");
     const querySnapshot = await query.get();
 
     const bankAccounts = querySnapshot.docs.map((doc) => ({
@@ -275,8 +275,8 @@ app.get("/bankAccount/user", authenticate, async (req, res) => {
     // Realiza uma query para encontrar o documento onde o 'associatedUser' é igual ao userId do token
     const bankAccountsRef = database.collection("bankAccounts");
     const snapshot = await bankAccountsRef
-      .where("associatedUser", "==", userId)
-      .get();
+        .where("associatedUser", "==", userId)
+        .get();
 
     if (snapshot.empty) {
       return res.status(404).send({
@@ -286,7 +286,7 @@ app.get("/bankAccount/user", authenticate, async (req, res) => {
 
     // Como usamos .limit(1), pegamos o primeiro documento retornado
     const doc = snapshot.docs[0];
-    const accountData = { id: doc.id, ...doc.data() };
+    const accountData = {id: doc.id, ...doc.data()};
 
     // Retorna os dados da conta
     return res.status(200).send(accountData);
@@ -303,18 +303,30 @@ app.get("/bankAccount/user", authenticate, async (req, res) => {
 // Create transaction (Transferência)
 app.post("/transactions", authenticate, async (req, res) => {
   const userId = req.user.user_id;
-  const { fromAccountId, toAccountId, amount, category } = req.body;
+  const {fromAccountNumber, toAccountNumber, amount, category} = req.body;
   let fileUrl;
   let fileName;
 
-  if (!fromAccountId || !toAccountId || !amount || amount <= 0) {
+  if (!fromAccountNumber || !toAccountNumber || !amount || amount <= 0) {
     return res
-      .status(400)
-      .send({ message: "Dados de transação inválidos ou incompletos." });
+        .status(400)
+        .send({message: "Dados de transação inválidos ou incompletos."});
   }
 
-  const fromAccountRef = database.collection("bankAccounts").doc(fromAccountId);
-  const toAccountRef = database.collection("bankAccounts").doc(toAccountId);
+  const snapshotFromAccountNumber = await database
+      .collection("bankAccounts")
+      .where("bankAccountNumber", "==", fromAccountNumber)
+      .get();
+
+  const snapshotToAccountNumber = await database
+      .collection("bankAccounts")
+      .where("bankAccountNumber", "==", toAccountNumber)
+      .get();
+
+  const fromAccountRef = snapshotFromAccountNumber.docs[0].ref;
+  const toAccountRef = snapshotToAccountNumber.docs[0].ref;
+
+
   // content-type': 'multipart/form-data
   try {
     // if (req.headers["content-type"] === "multipart/form-data") {
@@ -329,78 +341,80 @@ app.post("/transactions", authenticate, async (req, res) => {
     // }
 
     const transactionRefs = await database.runTransaction(
-      async (transaction) => {
-        const fromDoc = await transaction.get(fromAccountRef);
-        const toDoc = await transaction.get(toAccountRef);
+        async (transaction) => {
+          const fromDoc = await transaction.get(fromAccountRef);
+          const toDoc = await transaction.get(toAccountRef);
 
-        if (!fromDoc.exists || !toDoc.exists) {
-          throw new Error("Uma das contas bancárias não foi encontrada.");
-        }
+          if (!fromDoc.exists || !toDoc.exists) {
+            throw new Error("Uma das contas bancárias não foi encontrada.");
+          }
 
-        if (fromDoc.data().associatedUser !== userId) {
-          throw new Error(
-            "Permissão negada. Você não é o dono da conta de origem."
-          );
-        }
+          if (fromDoc.data().associatedUser !== userId) {
+            throw new Error(
+                "Permissão negada. Você não é o dono da conta de origem.",
+            );
+          }
 
-        const currentBalance = fromDoc.data().balance || 0;
-        const transferAmount = parseFloat(amount);
+          const currentBalance = fromDoc.data().balance || 0;
+          const transferAmount = parseFloat(amount);
 
-        if (currentBalance < transferAmount) {
-          throw new Error("Saldo insuficiente para realizar a transação.");
-        }
+          if (currentBalance < transferAmount) {
+            throw new Error("Saldo insuficiente para realizar a transação.");
+          }
 
-        const newFromBalance = currentBalance - transferAmount;
-        const newToBalance = (toDoc.data().balance || 0) + transferAmount;
+          const newFromBalance = currentBalance - transferAmount;
+          const newToBalance = (toDoc.data().balance || 0) + transferAmount;
 
-        transaction.update(fromAccountRef, { balance: newFromBalance });
-        transaction.update(toAccountRef, { balance: newToBalance });
+          transaction.update(fromAccountRef, {balance: newFromBalance});
+          transaction.update(toAccountRef, {balance: newToBalance});
 
-        const senderUID = fromDoc.data().associatedUser;
-        const receiverUID = toDoc.data().associatedUser;
-        const dateString = new Date();
-        const baseTransactionRef = database.collection("transactions").doc();
 
-        const senderTransactionData = {
-          fromAccountId: fromAccountId,
-          toAccountId: toAccountId,
-          amount: transferAmount,
-          date: dateString,
-          fileName: fileName || null,
-          fileUrl: fileUrl || null,
-          associatedUser: senderUID,
-          type: "sended",
-          createdAt: dateString,
-          name: fromDoc.data().name,
-          category: category,
-        };
+          const senderUID = fromDoc.data().associatedUser;
+          const receiverUID = toDoc.data().associatedUser;
+          const dateString = new Date();
+          const baseTransactionRef = database.collection("transactions").doc();
 
-        transaction.set(baseTransactionRef, senderTransactionData);
 
-        const receiverTransactionData = {
-          fromAccountId: fromAccountId,
-          toAccountId: toAccountId,
-          amount: transferAmount,
-          date: dateString,
-          fileName: fileName || null,
-          fileUrl: fileUrl || null,
-          associatedUser: receiverUID,
-          type: "received",
-          createdAt: dateString,
-          name: toDoc.data().name,
-          category: category,
-        };
+          const senderTransactionData = {
+            fromAccountNumber,
+            toAccountNumber,
+            amount: transferAmount,
+            date: dateString,
+            fileName: fileName || null,
+            fileUrl: fileUrl || null,
+            associatedUser: senderUID,
+            type: "sended",
+            createdAt: dateString,
+            name: fromDoc.data().name,
+            category: category,
+          };
 
-        const receiverTransactionRef = database
-          .collection("transactions")
-          .doc();
-        transaction.set(receiverTransactionRef, receiverTransactionData);
+          transaction.set(baseTransactionRef, senderTransactionData);
 
-        return {
-          senderId: baseTransactionRef.id,
-          receiverId: receiverTransactionRef.id,
-        };
-      }
+          const receiverTransactionData = {
+            fromAccountNumber,
+            toAccountNumber,
+            amount: transferAmount,
+            date: dateString,
+            fileName: fileName || null,
+            fileUrl: fileUrl || null,
+            associatedUser: receiverUID,
+            type: "received",
+            createdAt: dateString,
+            name: toDoc.data().name,
+            category: category,
+          };
+
+          const receiverTransactionRef = database
+              .collection("transactions")
+              .doc();
+          transaction.set(receiverTransactionRef, receiverTransactionData);
+
+          return {
+            senderId: baseTransactionRef.id,
+            receiverId: receiverTransactionRef.id,
+          };
+        },
     );
 
     return res.status(201).send({
@@ -417,7 +431,7 @@ app.post("/transactions", authenticate, async (req, res) => {
       error.message.includes("Permissão negada") ||
       error.message.includes("não foi encontrada")
     ) {
-      return res.status(403).send({ message: error.message });
+      return res.status(403).send({message: error.message});
     }
 
     return res.status(500).send({
@@ -431,16 +445,16 @@ app.post("/transactions", authenticate, async (req, res) => {
 app.get("/transactions", authenticate, async (req, res) => {
   try {
     const userId = req.user.user_id;
-    const { minAmount, maxAmount, month, itemsPerPage, lastItemId } = req.query;
+    const {minAmount, maxAmount, month, itemsPerPage, lastItemId} = req.query;
 
     const minAmountValue = minAmount ? parseFloat(minAmount) : null;
     const maxAmountValue = maxAmount ? parseFloat(maxAmount) : null;
     const pageSize = parseInt(itemsPerPage, 10) || 100;
 
     let query = database
-      .collection("transactions")
-      .where("associatedUser", "==", userId)
-      .orderBy("date", "desc");
+        .collection("transactions")
+        .where("associatedUser", "==", userId)
+        .orderBy("date", "desc");
 
     // 1. Aplicação dos Filtros de Quantidade
     if (minAmountValue !== null) {
@@ -475,9 +489,9 @@ app.get("/transactions", authenticate, async (req, res) => {
     // 3. Paginação
     if (lastItemId) {
       const cursorDoc = await database
-        .collection("transactions")
-        .doc(lastItemId)
-        .get();
+          .collection("transactions")
+          .doc(lastItemId)
+          .get();
 
       if (cursorDoc.exists) {
         query = query.startAfter(cursorDoc);
@@ -526,10 +540,10 @@ app.get("/transactions/:id", authenticate, async (req, res) => {
     const doc = await docRef.get();
 
     if (!doc.exists) {
-      return res.status(404).send({ message: "Transação não encontrada." });
+      return res.status(404).send({message: "Transação não encontrada."});
     }
 
-    const transactionData = { id: doc.id, ...doc.data() };
+    const transactionData = {id: doc.id, ...doc.data()};
 
     // ⭐️ VERIFICAÇÃO DE PROPRIEDADE
     if (transactionData.associatedUser !== userId) {
@@ -559,7 +573,7 @@ app.put("/transactions/:id", authenticate, async (req, res) => {
     const doc = await docRef.get();
 
     if (!doc.exists) {
-      return res.status(404).send({ message: "Transação não encontrada." });
+      return res.status(404).send({message: "Transação não encontrada."});
     }
 
     // ⭐️ VERIFICAÇÃO DE PROPRIEDADE
@@ -596,7 +610,7 @@ app.delete("/transactions/:id", authenticate, async (req, res) => {
     const doc = await docRef.get();
 
     if (!doc.exists) {
-      return res.status(404).send({ message: "Transação não encontrada." });
+      return res.status(404).send({message: "Transação não encontrada."});
     }
 
     // ⭐️ VERIFICAÇÃO DE PROPRIEDADE
@@ -627,9 +641,9 @@ app.get("/investments", authenticate, async (req, res) => {
     const userId = req.user.user_id;
 
     const query = database
-      .collection("investments")
-      .where("associatedUser", "==", userId)
-      .orderBy("createdAt", "desc");
+        .collection("investments")
+        .where("associatedUser", "==", userId)
+        .orderBy("createdAt", "desc");
 
     const querySnapshot = await query.get();
 
@@ -658,10 +672,10 @@ app.get("/investments/:id", authenticate, async (req, res) => {
     const doc = await docRef.get();
 
     if (!doc.exists) {
-      return res.status(404).send({ message: "Investimento não encontrado." });
+      return res.status(404).send({message: "Investimento não encontrado."});
     }
 
-    const investmentData = { id: doc.id, ...doc.data() };
+    const investmentData = {id: doc.id, ...doc.data()};
 
     // ⭐️ VERIFICAÇÃO DE PROPRIEDADE
     if (investmentData.associatedUser !== userId) {
@@ -692,7 +706,7 @@ app.put("/investments/:id", authenticate, async (req, res) => {
     const doc = await docRef.get();
 
     if (!doc.exists) {
-      return res.status(404).send({ message: "Investimento não encontrado." });
+      return res.status(404).send({message: "Investimento não encontrado."});
     }
 
     // ⭐️ VERIFICAÇÃO DE PROPRIEDADE
@@ -729,7 +743,7 @@ app.delete("/investments/:id", authenticate, async (req, res) => {
     const doc = await docRef.get();
 
     if (!doc.exists) {
-      return res.status(404).send({ message: "Investimento não encontrado." });
+      return res.status(404).send({message: "Investimento não encontrado."});
     }
 
     // ⭐️ VERIFICAÇÃO DE PROPRIEDADE
@@ -759,16 +773,16 @@ app.delete("/investments/:id", authenticate, async (req, res) => {
  * ========================================================================= */
 
 app.post("/upload", authenticate, (req, res) => {
-  const bb = busboy({ headers: req.headers });
+  const bb = busboy({headers: req.headers});
   const userId = req.user.uid;
   let uploadData = null;
 
   bb.on("file", (name, file, info) => {
-    const { filename, mimeType } = info;
+    const {filename, mimeType} = info;
     const uniqueFileName = `${Date.now()}-${filename}`;
     const filepath = path.join(os.tmpdir(), uniqueFileName);
 
-    uploadData = { filepath, filename: uniqueFileName, mimeType };
+    uploadData = {filepath, filename: uniqueFileName, mimeType};
     file.pipe(fs.createWriteStream(filepath));
   });
 
@@ -783,7 +797,7 @@ app.post("/upload", authenticate, (req, res) => {
         destination,
         metadata: {
           contentType: uploadData.mimeType,
-          metadata: { firebaseStorageDownloadTokens: token },
+          metadata: {firebaseStorageDownloadTokens: token},
         },
       });
 
@@ -797,7 +811,7 @@ app.post("/upload", authenticate, (req, res) => {
       });
 
       fs.unlinkSync(uploadData.filepath);
-      res.status(200).send({ url: publicUrl });
+      res.status(200).send({url: publicUrl});
     } catch (error) {
       res.status(500).send(error.message);
     }
@@ -837,8 +851,8 @@ app.get("/analytics", authenticate, async (req, res) => {
   try {
     // 1. Buscar todas as transações do usuário
     const transactionsQuery = database
-      .collection("transactions")
-      .where("associatedUser", "==", userId);
+        .collection("transactions")
+        .where("associatedUser", "==", userId);
 
     const snapshot = await transactionsQuery.get();
 
@@ -846,18 +860,18 @@ app.get("/analytics", authenticate, async (req, res) => {
     let currentBalance = 0;
     try {
       const accountsSnapshot = await database
-        .collection("bankAccounts")
-        .where("associatedUser", "==", userId)
-        .limit(1)
-        .get();
+          .collection("bankAccounts")
+          .where("associatedUser", "==", userId)
+          .limit(1)
+          .get();
       if (!accountsSnapshot.empty) {
         currentBalance = parseFloat(
-          accountsSnapshot.docs[0].data().balance || 0
+            accountsSnapshot.docs[0].data().balance || 0,
         );
       }
     } catch (e) {
       console.warn(
-        "Não foi possível buscar o saldo da conta principal. Usando 0.00 como fallback."
+          "Não foi possível buscar o saldo da conta principal. Usando 0.00 como fallback.",
       );
     }
 
@@ -931,15 +945,15 @@ app.get("/analytics", authenticate, async (req, res) => {
 
     // Conversão da agregação mensal em array ordenado e formatado
     const monthlyFlowData = Object.keys(monthlyData)
-      .sort() // Ordena por chave YYYY-MM
-      .map((key) => ({
-        label: monthlyData[key].label,
-        // O campo 'total' (que era o netFlow) foi removido.
-        income: parseFloat(monthlyData[key].income.toFixed(2)),
-        expense: parseFloat(monthlyData[key].expense.toFixed(2)),
-        // Converte para string YYYY-MM-DD
-        monthStart: monthlyData[key].monthStart.toISOString().split("T")[0],
-      }));
+        .sort() // Ordena por chave YYYY-MM
+        .map((key) => ({
+          label: monthlyData[key].label,
+          // O campo 'total' (que era o netFlow) foi removido.
+          income: parseFloat(monthlyData[key].income.toFixed(2)),
+          expense: parseFloat(monthlyData[key].expense.toFixed(2)),
+          // Converte para string YYYY-MM-DD
+          monthStart: monthlyData[key].monthStart.toISOString().split("T")[0],
+        }));
 
     // 5. Montagem da Resposta Final
     const analyticsData = {
@@ -961,8 +975,8 @@ app.get("/analytics", authenticate, async (req, res) => {
       charts: {
         // Gráfico de Barras: Receitas vs Despesas (Volume)
         revenueVsExpenses: [
-          { name: "Receitas", value: receivedAmount, color: "#43A047" }, // verde
-          { name: "Despesas", value: sendedAmount, color: "#E53935" }, // vermelho
+          {name: "Receitas", value: receivedAmount, color: "#43A047"}, // verde
+          {name: "Despesas", value: sendedAmount, color: "#E53935"}, // vermelho
         ],
 
         // Gráfico de Pizza: Distribuição por Tipo (Contagem)
@@ -987,7 +1001,7 @@ app.get("/analytics", authenticate, async (req, res) => {
 
         // Dados brutos de contagem/porcentagem
         distributionDetails: {
-          sended: { count: sendedCount, percentage: `${sendedPercentage}%` },
+          sended: {count: sendedCount, percentage: `${sendedPercentage}%`},
           received: {
             count: receivedCount,
             percentage: `${receivedPercentage}%`,
